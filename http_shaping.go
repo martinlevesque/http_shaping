@@ -9,6 +9,7 @@ import (
 	"text/template"
 	"time"
 	"strconv"
+	"github.com/martinlevesque/http_shaping/bytefmt"
 )
 
 // Config the plugin configuration.
@@ -37,6 +38,8 @@ type Demo struct {
 // New created a new Demo plugin.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	fmt.Print("Initiating http_shaping plugin ", name, "\n")
+	what := bytefmt.ToBytes("10.5GiB")
+	fmt.Print("what ", what, "\n")
 
 	if len(config.Headers) == 0 {
 		return nil, fmt.Errorf("headers cannot be empty")
