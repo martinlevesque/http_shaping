@@ -2,7 +2,6 @@
 package http_shaping
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -128,6 +127,8 @@ func (a *HttpShaping) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// the following bytes conversion methods are taken from:
+// https://github.com/cloudfoundry/bytefmt/blob/master/bytes.go
 
 const (
 	BYTE = 1 << (10 * iota)
