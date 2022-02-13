@@ -1,5 +1,5 @@
 # The name of your plugin as displayed in the Traefik Pilot web UI.
-displayName: Hello world
+displayName: Http Shaping
 
 # For now, `middleware` is the only type available.
 type: middleware
@@ -8,7 +8,7 @@ type: middleware
 import: github.com/martinlevesque/http_shaping
 
 # A brief description of what your plugin is doing.
-summary: Description of what my plugin is doing
+summary: Limit in/out traffic given a time interval.
 
 # Medias associated to the plugin (optional)
 iconPath: foo/icon.png
@@ -18,5 +18,7 @@ bannerPath: foo/banner.png
 # This is mandatory,
 # and Traefik Pilot will try to execute the plugin with the data you provide as part of its startup validity tests.
 testData:
-  Headers:
-    Foo: Bar
+  InTrafficLimit: 200MiB
+  OutTrafficLimit: 200MiB
+  LoopInterval: 60
+  ConsiderLimits: true
