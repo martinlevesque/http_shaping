@@ -1,4 +1,4 @@
-// Package plugindemo a demo plugin.
+
 package http_shaping
 
 import (
@@ -16,53 +16,77 @@ import (
 
 // Config the plugin configuration.
 type Config struct {
-	Headers map[string]string `json:"headers,omitempty"`
+	LoopInterval int64
+	InTrafficLimit string
+	OutTrafficLimit string
+	ConsiderLimits bool
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
-		Headers: make(map[string]string),
+		LoopInterval: 0,
 	}
 }
 
-// Demo a Demo plugin.
-type Demo struct {
+type HttpShaping struct {
 	next     http.Handler
-	headers  map[string]string
 	name     string
 	template *template.Template
 	loopBeginTimestamp int64
 	loopSumInBytes int64
 	loopSumOutBytes int64
+	loopInterval int64
+	inTrafficLimit uint64
+	outTrafficLimit uint64
+	considerLimits bool
 }
 
-// New created a new Demo plugin.
+// New created a new HttpShaping plugin.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	fmt.Print("Initiating http_shaping plugin ", name, "\n")
-	what := ToBytes("10.5GiB")
-	fmt.Print("what ", what, "\n")
+	fmt.Print("Config: ", config, "\n")
 
-	if len(config.Headers) == 0 {
-		return nil, fmt.Errorf("headers cannot be empty")
+	if config.LoopInterval <= 0 {
+		return nil, fmt.Errorf("LoopInterval should be positive")
 	}
 
-	return &Demo{
-		headers:  config.Headers,
+	inTrafficLimit, err := ToBytes(config.InTrafficLimit)
+
+	if err != nil {
+		return nil, fmt.Errorf("invalid inTrafficLimit")
+	}
+
+	outTrafficLimit, err := ToBytes(config.OutTrafficLimit)
+
+	if err != nil {
+		return nil, fmt.Errorf("invalid outTrafficLimit")
+	}
+
+	return &HttpShaping{
 		next:     next,
 		name:     name,
-		template: template.New("demo").Delims("[[", "]]"),
+		template: template.New("httpShaping").Delims("[[", "]]"),
 		loopBeginTimestamp: time.Now().Unix(),
 		loopSumInBytes: 0,
 		loopSumOutBytes: 0,
+		loopInterval: config.LoopInterval,
+		inTrafficLimit: inTrafficLimit,
+		outTrafficLimit: outTrafficLimit,
+		considerLimits: config.ConsiderLimits,
 	}, nil
 }
 
-func (a *Demo) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	fmt.Print("Serving http_shaping plugin \n")
+func (a *HttpShaping) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	fmt.Print("Serving http_shaping plugin, host=", req.Host, "\n")
 
-	fmt.Print("loopSumInBytes: ", a.loopSumInBytes, "\n")
-	fmt.Print("loopSumOutBytes: ", a.loopSumOutBytes, "\n")
+	// reset the begin loop if needed
+	if time.Now().Unix() - a.loopBeginTimestamp >= a.loopInterval {
+		fmt.Print("Reseting the loop interval, host=", req.Host, "\n")
+		a.loopBeginTimestamp = time.Now().Unix()
+		a.loopSumOutBytes = 0
+		a.loopSumInBytes = 0
+	}
 
 	requestBytesStr := req.Header.Get("content-length")
 
@@ -74,8 +98,23 @@ func (a *Demo) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	a.loopBeginTimestamp = time.Now().Unix()
+	// check if we reached any of the limit
+	fmt.Print("Current In: ", a.loopSumInBytes, " < ", a.inTrafficLimit, " host=", req.Host, "\n")
 
+	if a.considerLimits && a.loopSumInBytes >= int64(a.inTrafficLimit) {
+		http.Error(rw, "Bandwidth limit reached", http.StatusTooManyRequests)
+		return
+	}
+
+	fmt.Print("Current Out: ", a.loopSumOutBytes, " < ", a.outTrafficLimit, " host=", req.Host, "\n")
+
+	if a.considerLimits && a.loopSumOutBytes >= int64(a.outTrafficLimit) {
+		http.Error(rw, "Bandwidth limit reached", http.StatusTooManyRequests)
+		return
+	}
+	
+
+	// forwarding the request
 	a.next.ServeHTTP(rw, req)
 
 	responseBytesStr := rw.Header().Get("content-length")

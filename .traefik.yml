@@ -18,5 +18,7 @@ bannerPath: foo/banner.png
 # This is mandatory,
 # and Traefik Pilot will try to execute the plugin with the data you provide as part of its startup validity tests.
 testData:
-  Headers:
-    Foo: Bar
+  InTrafficLimit: 200MiB
+  OutTrafficLimit: 200MiB
+  LoopInterval: 60
+  ConsiderLimits: true

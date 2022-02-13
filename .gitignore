@@ -1,2 +1,3 @@
 configs-dev
 traefik-dev.yml
+plugins-local/
